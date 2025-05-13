@@ -117,7 +117,7 @@ const Agent = ({ userName, userId, type }: AgentProps) => {
                              />
 
                             <span>
-                                 {isCallInactiveOrFinished ? 'Call' : '. . .'}
+                                {isCallInactiveOrFinished ? 'Call' : '. . .'}
                             </span>
                     </button>
                 ) : (
