@@ -3,8 +3,9 @@ import {Button} from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
 import InterviewCard from "@/components/InterviewCard";
-import {getCurrentUser, } from "@/lib/actions/auth.action";
+import {getCurrentUser, signOut} from "@/lib/actions/auth.action";
 import {getInterviewsByUserId, getLatestInterviews } from "@/lib/actions/general.action";
+
 
 const Page = async () => {
     const user = await getCurrentUser();
@@ -25,11 +26,19 @@ const Page = async () => {
                     <p className="text-lg">
                         Practice on real interview questions & get instant feedback
                     </p>
+                        
                     
                     <Button asChild className="btn-primary max-sm:w-full">
                 <Link href="/interview">Start an Interview</Link>
                     </Button>
+                    <form action={signOut}>
+                        <Button type="submit" variant="secondary" className="btn-secondary mt-2 max-sm:w-full">
+                            Sign Out
+                        </Button>
+                    </form>
                 </div>
+                
+
 
                 <Image src="/robot.png" alt="robo-dude" width={400} height={400} className="max-sm:hidden" />
             </section>

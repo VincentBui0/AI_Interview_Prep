@@ -1,13 +1,16 @@
+// Marks this as a client-side component (Next.js)
 'use client';
 
-import Image from "next/image";
-import {cn} from "@/lib/utils";
-import {useRouter} from "next/navigation";
-import {useEffect, useState} from "react";
-import { vapi } from '@/lib/vapi.sdk';
-import {interviewer} from "@/constants";
-import {createFeedback} from "@/lib/actions/general.action";
+// Importing necessary modules and libraries
+import Image from "next/image"; // Next.js optimized image component
+import { cn } from "@/lib/utils"; // Utility for conditional className concatenation
+import { useRouter } from "next/navigation"; // For client-side routing
+import { useEffect, useState } from "react"; // React hooks
+import { vapi } from '@/lib/vapi.sdk'; // Custom SDK to handle voice API interactions
+import { interviewer } from "@/constants"; // Constant for interviewer config
+import { createFeedback } from "@/lib/actions/general.action"; // Function to store feedback
 
+// Enum to define various call statuses
 enum CallStatus {
     INACTIVE = 'INACTIVE',
     CONNECTING = 'CONNECTING',
@@ -15,25 +18,29 @@ enum CallStatus {
     FINISHED = 'FINISHED',
 }
 
+// Type for stored message
 interface SavedMessage {
     role: 'user' | 'system' | 'assistant';
     content: string;
 }
 
+// The main Agent component with props
 const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) => {
-    const router = useRouter();
-    const [isSpeaking, setIsSpeaking] = useState(false);
-    const [callStatus, setCallStatus] = useState<CallStatus>(CallStatus.INACTIVE);
-    const [messages, setMessages] = useState<SavedMessage[]>([]);
+    const router = useRouter(); // Router instance for navigation
+    const [isSpeaking, setIsSpeaking] = useState(false); // Indicates if the AI is currently speaking
+    const [callStatus, setCallStatus] = useState<CallStatus>(CallStatus.INACTIVE); // Tracks the current call state
+    const [messages, setMessages] = useState<SavedMessage[]>([]); // Stores the transcript messages
 
+    // Effect to set up VAPI event listeners
     useEffect(() => {
+        // Event handlers for VAPI events
         const onCallStart = () => setCallStatus(CallStatus.ACTIVE);
         const onCallEnd = () => setCallStatus(CallStatus.FINISHED);
 
         const onMessage = (message: Message) => {
+            // Only handle final transcripts
             if(message.type === 'transcript' && message.transcriptType === 'final') {
-                const newMessage = { role: message.role, content: message.transcript }
-
+                const newMessage = { role: message.role, content: message.transcript };
                 setMessages((prev) => [...prev, newMessage]);
             }
         }
@@ -43,6 +50,7 @@ const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) =
 
         const onError = (error: Error) => console.log('Error', error);
 
+        // Registering all VAPI event listeners
         vapi.on('call-start', onCallStart);
         vapi.on('call-end', onCallEnd);
         vapi.on('message', onMessage);
@@ -50,25 +58,29 @@ const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) =
         vapi.on('speech-end', onSpeechEnd);
         vapi.on('error', onError);
 
+        // Cleanup all listeners when component unmounts
         return () => {
             vapi.off('call-start', onCallStart);
             vapi.off('call-end', onCallEnd);
             vapi.off('message', onMessage);
             vapi.off('speech-start', onSpeechStart);
             vapi.off('speech-end', onSpeechEnd);
-            vapi.off('error', onError)
+            vapi.off('error', onError);
         }
     }, [])
 
+    // Function to handle feedback generation and redirection
     const handleGenerateFeedback = async (messages: SavedMessage[]) => {
         console.log('Generate feedback here.');
 
+        // Calls backend action to create feedback entry
         const { success, feedbackId: id } = await createFeedback({
             interviewId: interviewId!,
             userId: userId!,
             transcript: messages
-        })
+        });
 
+        // Redirect to feedback page or home depending on result
         if(success && id) {
             router.push(`/interview/${interviewId}/feedback`);
         } else {
@@ -77,20 +89,23 @@ const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) =
         }
     }
 
+    // Trigger feedback logic when call ends
     useEffect(() => {
         if(callStatus === CallStatus.FINISHED) {
             if(type === 'generate') {
-                router.push('/')
+                router.push('/') // For generate-only calls, return to home
             } else {
-                handleGenerateFeedback(messages);
+                handleGenerateFeedback(messages); // Else create feedback
             }
         }
     }, [messages, callStatus, type, userId]);
 
+    // Function to start a call
     const handleCall = async () => {
-        setCallStatus(CallStatus.CONNECTING);
+        setCallStatus(CallStatus.CONNECTING); // Set status to connecting
 
-        if(type ==='generate') {
+        if(type === 'generate') {
+            // For test generation calls, use workflow ID
             await vapi.start(process.env.NEXT_PUBLIC_VAPI_WORKFLOW_ID!, {
                 variableValues: {
                     username: userName,
@@ -98,14 +113,15 @@ const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) =
                 }
             })
         } else {
+            // Prepare formatted question list
             let formattedQuestions = '';
-
             if(questions) {
                 formattedQuestions = questions
                     .map((question) => `- ${question}`)
                     .join('\n');
             }
 
+            // Start the interview call using AI interviewer
             await vapi.start(interviewer, {
                 variableValues: {
                     questions: formattedQuestions
@@ -114,14 +130,18 @@ const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) =
         }
     }
 
+    // Function to stop an active call
     const handleDisconnect = async () => {
-        setCallStatus(CallStatus.FINISHED);
-
-        vapi.stop();
+        setCallStatus(CallStatus.FINISHED); // Mark call as finished
+        vapi.stop(); // Stop the VAPI call
     }
 
+    // Get the latest message from the transcript
     const latestMessage = messages[messages.length - 1]?.content;
+
+    // Boolean to check if call is inactive or ended
     const isCallInactiveOrFinished = callStatus === CallStatus.INACTIVE || callStatus === CallStatus.FINISHED;
+
 
     return (
         <>

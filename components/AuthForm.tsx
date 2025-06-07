@@ -1,39 +1,46 @@
+// This file is a client-side React component
 "use client";
 
-import { z } from "zod";
-import Link from "next/link";
-import Image from "next/image";
-import { toast } from "sonner";
-import { auth } from "@/firebase/client";
-import { useForm } from "react-hook-form";
-import { useRouter } from "next/navigation";
-import { zodResolver } from "@hookform/resolvers/zod";
+// Importing libraries and components
+import { z } from "zod"; // For schema validation
+import Link from "next/link"; // For client-side navigation
+import Image from "next/image"; // For optimized image rendering
+import { toast } from "sonner"; // For toast notifications
+import { auth } from "@/firebase/client"; // Firebase auth instance
+import { useForm } from "react-hook-form"; // Form state management
+import { useRouter } from "next/navigation"; // Next.js navigation hook
+import { zodResolver } from "@hookform/resolvers/zod"; // Bridge between Zod and react-hook-form
 
+// Firebase functions for authentication
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
 } from "firebase/auth";
 
+// UI components
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 
+// Custom backend actions
 import { signIn, signUp } from "@/lib/actions/auth.action";
-import FormField from "./FormField";
+import FormField from "./FormField"; // Custom form input field component
 
+// Function that returns a validation schema depending on form type (sign-in or sign-up)
 const authFormSchema = (type: FormType) => {
   return z.object({
-    name: type === "sign-up" ? z.string().min(3) : z.string().optional(),
-    email: z.string().email(),
-    password: z.string().min(3),
+    name: type === "sign-up" ? z.string().min(3) : z.string().optional(), // Only required in sign-up
+    email: z.string().email(), // Must be a valid email
+    password: z.string().min(3), // Minimum password length
   });
 };
 
+// The main AuthForm component
 const AuthForm = ({ type }: { type: FormType }) => {
-  const router = useRouter();
+  const router = useRouter(); // For programmatic navigation
 
-  const formSchema = authFormSchema(type);
+  const formSchema = authFormSchema(type); // Create schema based on type
   const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema), // Use Zod to validate
     defaultValues: {
       name: "",
       email: "",
@@ -41,17 +48,21 @@ const AuthForm = ({ type }: { type: FormType }) => {
     },
   });
 
+  // Function to handle form submission
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     try {
       if (type === "sign-up") {
+        // Destructure user inputs
         const { name, email, password } = data;
 
+        // Create user in Firebase
         const userCredential = await createUserWithEmailAndPassword(
           auth,
           email,
           password
         );
 
+        // Call backend signUp logic
         const result = await signUp({
           uid: userCredential.user.uid,
           name: name!,
@@ -59,42 +70,51 @@ const AuthForm = ({ type }: { type: FormType }) => {
           password,
         });
 
+        // Handle potential backend error
         if (!result.success) {
           toast.error(result.message);
           return;
         }
 
+        // Notify and redirect user to sign-in
         toast.success("Account created successfully. Please sign in.");
         router.push("/sign-in");
       } else {
+        // Sign-in case
         const { email, password } = data;
 
+        // Firebase sign-in
         const userCredential = await signInWithEmailAndPassword(
           auth,
           email,
           password
         );
 
+        // Get JWT token
         const idToken = await userCredential.user.getIdToken();
         if (!idToken) {
           toast.error("Sign in Failed. Please try again.");
           return;
         }
 
+        // Call backend signIn logic
         await signIn({
           email,
           idToken,
         });
 
+        // Notify and redirect
         toast.success("Signed in successfully.");
         router.push("/");
       }
     } catch (error) {
+      // Catch any unexpected errors
       console.log(error);
       toast.error(`There was an error: ${error}`);
     }
   };
 
+  // Helper to check if the form is in sign-in mode
   const isSignIn = type === "sign-in";
 
   return (
